@@ -14,12 +14,25 @@ class states:
 	'established_connection':4,
 			}   
 	
+class rpcCommands:
+	def __init__(self):
+		pass
+	
+	permitted_commands = {
+		'print' : 'print({})',
+		'update' : '#send client names',
+		'pause' : None,				
+						}
+	
+	def execute(self, command):
+		pass
+	
 class entity:
 	'''a client entity
 	'''
-	def __init__(self, name, id, ip, timeout):
+	def __init__(self, name, cid, ip, timeout):
 		self.name = name
-		self.id = id
+		self.cid = cid
 		self.ip = ip
 		self.timeout = timeout #0 is the time last received, #1 is the difference
 		self.latency = [0, 100, 100]

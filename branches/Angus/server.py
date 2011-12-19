@@ -1,7 +1,10 @@
 import multipy
+import pickle
 
-myserver = multipy.server(port=1060, timeout=3, limit=4)
+print(pickle.dumps.__doc__)
 
+myserver = multipy.server(port=1059, timeout=3, limit=4)
+print(multipy.server.__init__.__doc__)
 myserver.start()
 
 '''The function start() will simulate a server_forever() function
