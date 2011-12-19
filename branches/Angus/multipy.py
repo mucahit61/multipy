@@ -127,7 +127,7 @@ class server:
 			if entity_id == id:
 				continue
 			data = ([state, id, data, rpc])
-			self.handler.sendto(packer.pack(data), entity_ip)
+			self.handler.sendto(packet, entity_ip)
 			
 		entity = self.client_dic[id]	
 		entity.timeout[0] = time()
@@ -162,7 +162,7 @@ class server:
 class client:
 	'''main client class'''
 	
-	def __init__(self, name = 'client', port = 2745, timeout = 120):
+	def __init__(self, name = 'client', port = 2745, timeout = 3):
 		'''initialises the client
 		:param name: the name of the client
 		:param port: the port for the client to communicate over
@@ -198,8 +198,13 @@ class client:
 		data = ([state, name])
 		self.tunnel.sendto(packer.pack(data), self.server)
 		
-		#TODO: CLIENT: force timeout of connection
+		#TODO: [COMPLETED]: force timeout of connection
+		start_time = time()
+		
 		while not self.connected:
+			current_time = time()
+			if (current_time - start_time) > self.timeout:
+				break 
 			try:
 				packet, ip = self.tunnel.recvfrom(1024)
 			except:
@@ -210,9 +215,13 @@ class client:
 			self.server = (self.server[0], port)
 			self.id = id
 			print('client connected: {}'.format(self.server))
-	
+			return
+		print('client could not reach host: {}'.format(self.server))
+		
 	def update(self):
-		'''checks for new data and updates core data'''
+		'''checks for new data and updates core data
+		returns any received data
+		'''
 		
 		try:
 			packet, ip = self.tunnel.recvfrom(1024)
@@ -235,13 +244,15 @@ class client:
 		if not id in self.id_to_name.keys():
 			self.id_to_name[id] = None
 			print('client {} connected'.format(id))
+			
+		return data
 		
-		
-		#TODO: CLIENT: return received data to called
+		#TODO: [COMPLETED]: return received data to called
 		
 	def send(self, _data):
 		'''send a datatype to the server
 		:param _data: the data to be compressed and sent to the host
+		returns the size of the packet
 		'''
 		
 		if not object:
@@ -251,4 +262,4 @@ class client:
 		_rpc = None
 		data = ([_state, _id, _data, _rpc])		
 		packet_size = self.tunnel.sendto(packer.pack(data), self.server)
-		print(packet_size, data)
+		return packet_size
