@@ -1,11 +1,11 @@
 import multipy
 	
-client = multipy.client(port=2857)
-client.connect(ip='localhost', port=1025)
+client = multipy.client()
+client.connect(ip='localhost', port=1020)
 
 while 1:
 	received_data = client.update()
-	packet_size = client.send('Hello World')
+	packet_size = client.send('keep alive')
 	
 '''The function update() will force the client to check for new data
 the client will detect new clients, and remove old ones in this way

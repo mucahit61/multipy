@@ -3,8 +3,6 @@ from rencode import dumps, loads
 class states:
 	'''states used by the server / client
 	'''
-	def __init__(self):
-		pass
 	
 	states = {
 	'new_connection':0,
@@ -15,16 +13,13 @@ class states:
 			}   
 	
 class rpcCommands:
-	def __init__(self):
-		pass
-	
 	permitted_commands = {
 		'print' : 'print({})',
 		'update' : '#send client names',
 		'pause' : None,				
 						}
 	
-	def execute(self, command):
+	def execute(command):
 		pass
 	
 class entity:
@@ -40,9 +35,7 @@ class entity:
 class packer:
 	'''how data is packed / unpacked
 	'''
-	def __init__(self):
-		pass
-	
+
 	def pack(data):
 		'''packs data for socket
 		'''
