@@ -1,7 +1,7 @@
 from socket import socket, AF_INET, SOCK_DGRAM
 from random import randint
 from math import ceil
-from classes import states, entity, packer
+from classes import states, entity, packer, rpcCommands
 from time import time
 				
 class server:
@@ -59,7 +59,7 @@ class server:
 			limit = ceil(float(len(self.client_dic)) / 10) * 10
 			cid = randint(0, limit)
 			if cid in self.client_dic.keys():
-				cid = connection_cid(self)
+				cid = connection_cid()
 			return(cid)
 		
 		cid = connection_cid()
@@ -134,10 +134,17 @@ class server:
 			#invalid packet
 			return
 		
+		
 		if not cid in self.client_dic.keys():
 			#unregistered client
 			return  
-				
+		
+		#print(data)
+		
+		# Do rpc commands
+		if rpc:
+			rpcCommands.execute(rpc)
+		
 		# To maintain efficiency, client functions share the data from one port
 		# The forwarding is not executed if the server is paused
 		# But listens for resume connection calls	
@@ -148,8 +155,6 @@ class server:
 		for ip, entity in self.ip_dic.items():
 			if entity.cid == cid:
 				continue
-			
-			data = ([state, cid, data, rpc])
 			self.handler.sendto(packet, ip)
 		
 		# Update entity timouts	
@@ -189,7 +194,7 @@ class server:
 class client:
 	'''main client class'''
 	
-	def __init__(self, name = 'client', port = 2745, timeout = 3):
+	def __init__(self, name = 'client', port = 0, timeout = 3):
 		'''initialises the client
 		:param name: the name of the client
 		:param port: the port for the client to communicate over
@@ -208,11 +213,11 @@ class client:
 		self.tunnel = socket(AF_INET, SOCK_DGRAM)
 		self.tunnel.bind(self.local)
 		self.tunnel.setblocking(0)	
+		self.local = self.tunnel.getsockname() #if port 0 is used, then os chooses port.
 		
 		alert = 'client initialised: {}'.format(self.local)
 		
 		print(alert)
-		
 		print(''.join(['-' for i in range(len(alert))]))
 	
 	def connect(self, ip = 'localhost', port = 1012):
@@ -277,11 +282,11 @@ class client:
 			self.cid_to_name[cid] = None
 			print('{} connected'.format(cid))
 			
-		return data
+		return packer.unpack(packet)
 		
 		#TODO: [COMPLETED]: return received data to called
 		
-	def send(self, _data):
+	def send(self, data, rpc = None):
 		'''send a datatype to the server
 		:param _data: the data to be compressed and sent to the host
 		returns the size of the packet
@@ -289,9 +294,8 @@ class client:
 		
 		if not object:
 			return
-		_state = states.states['established_connection']
-		_cid = self.cid
-		_rpc = None
-		data = ([_state, _cid, _data, _rpc])		
-		packet_size = self.tunnel.sendto(packer.pack(data), self.server)
+		state = states.states['established_connection']
+		cid = self.cid
+		_data = ([state, cid, data, rpc])		
+		packet_size = self.tunnel.sendto(packer.pack(_data), self.server)
 		return packet_size
