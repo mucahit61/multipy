@@ -12,16 +12,7 @@ class states:
 	'established_connection':4,
 			}   
 	
-class rpcCommands:
-	permitted_commands = {
-		'print' : 'print({})',
-		'update' : '#send client names',
-		'pause' : None,				
-						}
-	
-	def execute(command):
-		pass
-	
+
 class entity:
 	'''a client entity
 	'''
