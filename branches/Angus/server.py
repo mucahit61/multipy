@@ -1,6 +1,6 @@
 import multipy
 
-myserver = multipy.server(port=1020, timeout=6, limit=20)
+myserver = multipy.server(port=1020, timeout=3, limit=5)
 myserver.start()
 
 '''The function start() will simulate a server_forever() function

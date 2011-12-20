@@ -1,7 +1,7 @@
 from socket import socket, AF_INET, SOCK_DGRAM
 from random import randint
 from math import ceil
-from classes import states, entity, packer, rpcCommands
+from classes import states, entity, packer
 from time import time
 				
 class server:
@@ -44,8 +44,7 @@ class server:
 		for alert in initialised:
 			print(alert)
 		
-		biggest_alert = max([len(alert) for alert in initialised])
-		print(''.join(['-' for i in range(biggest_alert)]))
+		print(''.join(['-' for i in range(max([len(alert) for alert in initialised]))]))
 		
 	def add_client(self, name, ip):	 
 		'''register new client
@@ -71,7 +70,10 @@ class server:
 		self.ip_dic[ip] = entity(name, cid, ip, timeout)
 		self.client_dic[cid] = self.ip_dic[ip]
 		
+		# Fun debugging stuff, not actually needed
+		contents = ['|' if i < len(self.client_dic) else ' ' for i in range(self.limit)]
 		print("{} connected".format(cid))
+		print('[{0}]{1}{2}'.format(''.join(contents), int((len(self.client_dic)/self.limit)*100),'% Capacity'))
 		
 	def remove_client(self, cid, ip):
 		'''force client removal
@@ -85,8 +87,8 @@ class server:
 		self.client_dic.pop(cid)
 		self.ip_dic.pop(ip)				
 		
-		for ip, entity_cid in self.ip_dic.items():
-			if entity_cid == cid:
+		for ip, entity in self.ip_dic.items():
+			if entity.cid == cid:
 				continue
 			try:
 				self.handler.sendto(packer.pack(data), ip)
@@ -109,8 +111,7 @@ class server:
 			pass
 		
 		if len(self.client_dic) == self.limit:
-			data = [state]
-			self.handler.sendto(packer.pack(data), ip)
+			return
 		
 		if ip in self.ban_list:
 			return
@@ -134,16 +135,9 @@ class server:
 			#invalid packet
 			return
 		
-		
 		if not cid in self.client_dic.keys():
 			#unregistered client
 			return  
-		
-		#print(data)
-		
-		# Do rpc commands
-		if rpc:
-			rpcCommands.execute(rpc)
 		
 		# To maintain efficiency, client functions share the data from one port
 		# The forwarding is not executed if the server is paused
@@ -183,7 +177,7 @@ class server:
 		'''similar to socketserver's server_forever()'''	
 		while 1:
 			self.manage()
-			
+			#if paused, don't act
 			if self.paused:
 				continue
 			# Update server processes as usual
@@ -216,7 +210,6 @@ class client:
 		self.local = self.tunnel.getsockname() #if port 0 is used, then os chooses port.
 		
 		alert = 'client initialised: {}'.format(self.local)
-		
 		print(alert)
 		print(''.join(['-' for i in range(len(alert))]))
 	
@@ -246,13 +239,16 @@ class client:
 				packet, ip = self.tunnel.recvfrom(1024)
 			except:
 				continue
-			
-			self.connected = True
+
 			state, port, cid = packer.unpack(packet)	
+			
 			self.server = (self.server[0], port)
+			self.connected = True
 			self.cid = cid
+			
 			print('client connected: {}'.format(self.server))
 			return
+		
 		print('client could not reach host: {}'.format(self.server))
 		
 	def update(self):
@@ -266,27 +262,29 @@ class client:
 			return
 		
 		try:
-			state, cid, data, rpc = packer.unpack(packet)
+			state, cid, *data = packer.unpack(packet)
 		except:
 			#invalid packet
 			return
-			
+		
+		
 		if state == states.states['remove_connection']:
 			if cid in self.cid_to_name.keys():
-				self.name_to_cid.pop(self.cid_to_name[cid])
+				if self.cid_to_name[cid]:
+					self.name_to_cid.pop(self.cid_to_name[cid])
 				self.cid_to_name.pop(cid)
-				print('{} disconnected'.format(cid))
+				
+			print('{} disconnected'.format(cid))
 			return
 		
 		if not cid in self.cid_to_name.keys():
 			self.cid_to_name[cid] = None
 			print('{} connected'.format(cid))
 			
-		return packer.unpack(packet)
-		
+		return packer.unpack(packet)		
 		#TODO: [COMPLETED]: return received data to called
 		
-	def send(self, data, rpc = None):
+	def send(self, data, rpc=None):
 		'''send a datatype to the server
 		:param _data: the data to be compressed and sent to the host
 		returns the size of the packet
@@ -294,6 +292,7 @@ class client:
 		
 		if not object:
 			return
+		
 		state = states.states['established_connection']
 		cid = self.cid
 		_data = ([state, cid, data, rpc])		
