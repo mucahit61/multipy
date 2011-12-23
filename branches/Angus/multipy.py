@@ -251,7 +251,7 @@ class client:
 		
 		print('client could not reach host: {}'.format(self.server))
 		
-	def update(self):
+	def update(self, debug=True, established=False):
 		'''checks for new data and updates core data
 		returns any received data
 		'''
@@ -267,7 +267,10 @@ class client:
 			#invalid packet
 			return
 		
-		
+		if not cid in self.cid_to_name.keys():
+			self.cid_to_name[cid] = None
+			print('{} connected'.format(cid))
+			
 		if state == states.states['remove_connection']:
 			if cid in self.cid_to_name.keys():
 				if self.cid_to_name[cid]:
@@ -275,13 +278,13 @@ class client:
 				self.cid_to_name.pop(cid)
 				
 			print('{} disconnected'.format(cid))
-			return
 		
-		if not cid in self.cid_to_name.keys():
-			self.cid_to_name[cid] = None
-			print('{} connected'.format(cid))
-			
-		return packer.unpack(packet)		
+		if established:
+			if state != states.states['established_connection']:
+				return
+		if debug:
+			return packer.unpack(packet)		
+		return data[0]
 		#TODO: [COMPLETED]: return received data to called
 		
 	def send(self, data, rpc=None):
