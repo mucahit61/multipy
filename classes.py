@@ -5,14 +5,24 @@ class states:
 	'''
 	
 	states = {
-	'new_connection':0,
-	'remove_connection':1,
-	'limit_connection':2,
-	'ping_connection':3,
-	'established_connection':4,
+	'new_connection' : 0,
+	'remove_connection' : 1,
+	'limit_connection' : 2,
+	'ping_connection' : 3,
+	'established_connection' : 4,
+	'server_message' : 5,
 			}   
 	
-
+class rpcCommands:
+	permitted_commands = {
+		'print' : 'print({})',
+		'update' : '#send client names',
+		'pause' : None,				
+						}
+	
+	def execute(command):
+		pass
+	
 class entity:
 	'''a client entity
 	'''
