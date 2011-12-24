@@ -38,12 +38,12 @@ class server:
 		self.manager.setblocking(0)	 
 		
 		initialised = [
-		'server listener initialised: {}'.format(handler),
-		'server manager initialised: {}'.format(manager),			
-					]
+			'server listener initialised: {}'.format(handler),
+			'server manager initialised: {}'.format(manager),			
+					  ]
 		for alert in initialised:
 			print(alert)
-		
+			
 		print(''.join(['-' for i in range(max([len(alert) for alert in initialised]))]))
 		
 	def add_client(self, name, ip):	 
@@ -59,6 +59,7 @@ class server:
 			cid = randint(0, limit)
 			if cid in self.client_dic.keys():
 				cid = connection_cid()
+				
 			return(cid)
 		
 		cid = connection_cid()
@@ -72,6 +73,7 @@ class server:
 		
 		# Fun debugging stuff, not actually needed
 		contents = ['|' if i < len(self.client_dic) else ' ' for i in range(self.limit)]
+		
 		print("{} connected".format(cid))
 		print('[{0}]{1}{2}'.format(''.join(contents), int((len(self.client_dic)/self.limit)*100),'% Capacity'))
 		
@@ -90,8 +92,10 @@ class server:
 		for ip, entity in self.ip_dic.items():
 			if entity.cid == cid:
 				continue
+				
 			try:
 				self.handler.sendto(packer.pack(data), ip)
+				
 			except Exception as Error:
 				print(Error)
 			
@@ -107,7 +111,7 @@ class server:
 		try:		
 			state, name = packer.unpack(packet)
 		except:
-			#bad packet
+			# Invalid packet
 			pass
 		
 		if len(self.client_dic) == self.limit:
@@ -132,11 +136,11 @@ class server:
 		try:
 			state, cid, data, rpc = packer.unpack(packet)
 		except:
-			#invalid packet
+			# Invalid packet
 			return
 		
 		if not cid in self.client_dic.keys():
-			#unregistered client
+			# Unregistered client
 			return  
 		
 		# To maintain efficiency, client functions share the data from one port
@@ -149,19 +153,35 @@ class server:
 		for ip, entity in self.ip_dic.items():
 			if entity.cid == cid:
 				continue
+				
 			self.handler.sendto(packet, ip)
 		
 		# Update entity timouts	
 		entity = self.client_dic[cid]	
 		entity.timeout = [time(), 0]
 		
+		# Run callbacks and send any returned data
+		for callback in self.callbacks:	
+			returned_data = callback(self, packer.unpack(packet))
+			
+			if not returned_data:
+				continue
+
+			state = states.states['server_message']			
+			server_data = [state, -2, returned_data, None]				
+			packet = packer.pack(server_data)
+			
+			for ip, entity in self.ip_dic.items():
+				self.handler.sendto(packet, ip)
+			
 	def admin(self):
 		'''runs the server protocols
 		'''
 		
 		remove_clients = []
-		
+		# Timeout old clients
 		for ip, entity in self.ip_dic.items():
+			
 			last_received, count = entity.timeout	
 			difference = time() - last_received
 			entity.timeout[1] = difference			
@@ -173,14 +193,19 @@ class server:
 		for cid, ip in remove_clients:
 			self.remove_client(cid, ip)
 			
-	def start(self):
+	def start(self, callbacks = []):
 		'''similar to socketserver's server_forever()'''	
-		while 1:
+		
+		if not type(callbacks) == list:
+			callbacks = [callbacks]
+		
+		self.callbacks = callbacks
+		
+		# Update server, but do not accept new connections if paused
+		while True:
 			self.manage()
-			#if paused, don't act
 			if self.paused:
 				continue
-			# Update server processes as usual
 			self.listen()
 			self.admin()
 			
@@ -223,12 +248,12 @@ class client:
 			return
 		
 		self.server = (ip, port)
+		
 		state = states.states['new_connection']
 		name = self.name
 		data = ([state, name])
 		self.tunnel.sendto(packer.pack(data), self.server)
 		
-		#TODO: [COMPLETED]: force timeout of connection
 		start_time = time()
 		
 		while not self.connected:
@@ -247,6 +272,7 @@ class client:
 			self.cid = cid
 			
 			print('client connected: {}'.format(self.server))
+			
 			return
 		
 		print('client could not reach host: {}'.format(self.server))
@@ -264,7 +290,7 @@ class client:
 		try:
 			state, cid, *data = packer.unpack(packet)
 		except:
-			#invalid packet
+			# Invalid packet
 			return
 		
 		if not cid in self.cid_to_name.keys():
@@ -285,7 +311,6 @@ class client:
 		if debug:
 			return packer.unpack(packet)		
 		return data[0]
-		#TODO: [COMPLETED]: return received data to called
 		
 	def send(self, data, rpc=None):
 		'''send a datatype to the server
