@@ -307,7 +307,9 @@ class client:
 		
 		if established:
 			if state != states.states['established_connection']:
-				return
+				if not state == state.states['server_message']:
+					return
+					
 		if debug:
 			return packer.unpack(packet)		
 		return data[0]
