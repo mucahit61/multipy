@@ -3,7 +3,8 @@ from random import randint
 from math import ceil
 from classes import states, entity, packer
 from time import time
-				
+from sys import getsizeof			
+			
 class server:
 	'''main server class
 	'''
@@ -26,6 +27,8 @@ class server:
 		self.ip_dic = { }
 		self.ban_list = []
 		self.paused = False
+		self.recv_bytes = 0
+		self.sent_bytes = 0
 		
 		handler = ('localhost', self.handler_port)
 		manager = ('localhost', self.manager_port)
@@ -133,6 +136,8 @@ class server:
 		except:
 			return
 		
+		self.recv_bytes += getsizeof(packet)
+		
 		try:
 			state, cid, data, rpc = packer.unpack(packet)
 		except:
@@ -172,8 +177,9 @@ class server:
 			packet = packer.pack(server_data)
 			
 			for ip, entity in self.ip_dic.items():
-				self.handler.sendto(packet, ip)
-			
+				packet_size = self.handler.sendto(packet, ip)
+				self.sent_bytes += packet_size
+				
 	def admin(self):
 		'''runs the server protocols
 		'''
@@ -228,6 +234,8 @@ class client:
 		self.connected = False
 		self.cid_to_name = {}
 		self.name_to_cid = {}
+		self.recv_bytes = 0
+		self.sent_bytes = 0
 		
 		self.tunnel = socket(AF_INET, SOCK_DGRAM)
 		self.tunnel.bind(self.local)
@@ -287,6 +295,8 @@ class client:
 		except:
 			return
 		
+		self.recv_bytes += getsizeof(packet)
+		
 		try:
 			state, cid, *data = packer.unpack(packet)
 		except:
@@ -327,4 +337,5 @@ class client:
 		cid = self.cid
 		_data = ([state, cid, data, rpc])		
 		packet_size = self.tunnel.sendto(packer.pack(_data), self.server)
+		self.sent_bytes += packet_size
 		return packet_size
