@@ -1,10 +1,10 @@
-from socket import socket, AF_INET, SOCK_DGRAM
+﻿from socket import socket, AF_INET, SOCK_DGRAM
 from random import randint
 from math import ceil
-from classes import states, entity, packer
 from time import time
 from sys import getsizeof			
-			
+from classes import states, entity, packer
+
 class server:
 	'''main server class
 	'''
@@ -30,8 +30,8 @@ class server:
 		self.recv_bytes = 0
 		self.sent_bytes = 0
 		
-		handler = ('localhost', self.handler_port)
-		manager = ('localhost', self.manager_port)
+		handler = ('', self.handler_port)
+		manager = ('', self.manager_port)
 		
 		self.handler = socket(AF_INET, SOCK_DGRAM)
 		self.manager = socket(AF_INET, SOCK_DGRAM)
@@ -110,7 +110,7 @@ class server:
 			packet, ip = self.handler.recvfrom(1024)
 		except:
 			return
-		
+			
 		try:		
 			state, name = packer.unpack(packet)
 		except:
@@ -199,7 +199,7 @@ class server:
 		for cid, ip in remove_clients:
 			self.remove_client(cid, ip)
 			
-	def start(self, callbacks = []):
+	def serve_forever(self, callbacks = []):
 		'''similar to socketserver's server_forever()'''	
 		
 		if not type(callbacks) == list:
@@ -215,7 +215,21 @@ class server:
 			self.listen()
 			self.admin()
 			
-			
+	def update(self, callbacks = []):
+		'''runs server in the same way as serve_forever, but doesn't 
+		freeze game logic by using a per-tick update'''
+		if not type(callbacks) == list:
+			callbacks = [callbacks]
+		
+		self.callbacks = callbacks
+		
+		# Update server, but do not accept new connections if paused
+		self.manage()
+		if self.paused:
+			return
+		self.listen()
+		self.admin()
+		
 class client:
 	'''main client class'''
 	
@@ -226,7 +240,7 @@ class client:
 		:param timeout: the time in seconds before the client aborts connection
 		'''
 				
-		self.local = ('localhost', port)
+		self.local = ('', port)
 		self.name = name
 		self.cid = name
 		self.timeout = timeout
@@ -240,7 +254,8 @@ class client:
 		self.tunnel = socket(AF_INET, SOCK_DGRAM)
 		self.tunnel.bind(self.local)
 		self.tunnel.setblocking(0)	
-		self.local = self.tunnel.getsockname() #if port 0 is used, then os chooses port.
+		
+		self.local = self.tunnel.getsockname()
 		
 		alert = 'client initialised: {}'.format(self.local)
 		print(alert)
@@ -268,6 +283,7 @@ class client:
 			current_time = time()
 			if (current_time - start_time) > self.timeout:
 				break 
+			self.tunnel.sendto(packer.pack(data), self.server)
 			try:
 				packet, ip = self.tunnel.recvfrom(1024)
 			except:
