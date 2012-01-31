@@ -1,11 +1,11 @@
 import multipy
 	
 client = multipy.client()
-client.connect(ip='localhost', port=1020)
+client.connect(ip=input("Enter something: "), port=1200)
 
 while 1:
 	received_data = client.update()
-	packet_size = client.send('keep alive')
+	packet_size = client.send('im talking :D')
 	
 	
 	
