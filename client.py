@@ -1,6 +1,6 @@
 import multipy
 
-class BareBonesClient(multipy.client):
+class BareBonesClient(multipy.Client):
     
     def on_connect(self, cid):
         print("We've connected!")

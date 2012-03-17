@@ -1,6 +1,6 @@
 import multipy
 
-class BareBonesServer(multipy.server):
+class BareBonesServer(multipy.Server):
     
     def on_receive(self, data):
         # data is the uncompressed packet
