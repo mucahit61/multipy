@@ -41,3 +41,17 @@ except ValueError:
 	
 self.send(data, [ip for ip, entity in self.ip_dic.items() if entity.cid != cid])	
 }}}
+= To call a server instance =
+First, call an instance of the server:
+{{{
+my_server = BareBonesServer(port = 1200, timeout = 3, limit = 4, ping = 60)
+}}}
+You can change how the server runs depending on if it is enclosed in a frame-by-frame environment, such as PyGame or Blender Game Engine:
+The forever flag runs in a while loop:
+{{{
+my_server.update(forever=True)
+}}}
+Therefore setting it to false / leaving it updates for one frame
+{{{
+my_server.update() # forever=False
+}}}
