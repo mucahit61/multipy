@@ -1,4 +1,4 @@
-﻿from socket import socket, AF_INET, SOCK_DGRAM
+from socket import socket, AF_INET, SOCK_DGRAM, error
 from random import randint
 from math import ceil
 from time import time
@@ -11,10 +11,10 @@ class server:
 	
 	def __init__(self, port = 1000, timeout = 3, limit = 4, ping = 60):
 		'''creates a server instance
-		:param port: the port for the server to communicate on (handler)
-		:param timeout: the time in seconds before client timeout
-		:param limit: the maximum clients that can connect
-		:param ping: the interval in seconds between client ping
+		@param port: the port for the server to communicate on (handler)
+		@param timeout: the time in seconds before client timeout
+		@param limit: the maximum clients that can connect
+		@param ping: the interval in seconds between client ping
 		'''
 		
 		self.handler_port = port
@@ -26,7 +26,7 @@ class server:
 		self.client_dic = { }
 		self.ip_dic = { }
 		self.ban_list = []
-		self.paused = False
+		
 		self.recv_bytes = 0
 		self.sent_bytes = 0
 		
@@ -39,151 +39,131 @@ class server:
 		self.manager.bind(manager)
 		self.handler.setblocking(0)
 		self.manager.setblocking(0)	 
+	
 		
-		initialised = [
-			'server listener initialised: {}'.format(handler),
-			'server manager initialised: {}'.format(manager),			
-					  ]
-		for alert in initialised:
-			print(alert)
+		print('server listener initialised: {}'.format(handler))
+		print('server manager initialised: {}'.format(manager))		
+		
+	# User methods
+	def on_receive(self, data):
+		# Forward data to other clients
+		try:
+			state, cid, data, rpc = data
+		except ValueError:
+			print("packet could not be unpacked")
 			
-		print(''.join(['-' for i in range(max([len(alert) for alert in initialised]))]))
-		
-	def add_client(self, name, ip):	 
-		'''register new client
-		:param name: the name of the client to store
-		:param ip: the address [ip, port] of the client to store
+		self.send(data, [ip for ip, entity in self.ip_dic.items() if entity.cid != cid])	
+	
+	def on_send(self, data):
+		pass
+	
+	def on_client_connect(self, cid):
+		pass
+	
+	def on_client_disconnect(self, cid):
+		pass
+	
+	# Core methods
+	def send(self, data, ip):	
+		'''send packet method (packs and sends to each ip in given list
 		'''
+		if not isinstance(ip, list):
+			ip = [ip]
+				
+		packet = packer.pack(data)	
+		sent_bytes = 0
+		for address in ip:
+			packet_size = self.handler.sendto(packet, address)
+			sent_bytes += packet_size
 		
+		self.sent_bytes += sent_bytes
+		self.on_send(data)
+		return sent_bytes
+	
+	def client_connect(self, name, ip):	 
+		'''register new client
+		@param name: the name of the client to store
+		@param ip: the address [ip, port] of the client to store
+		'''		
 		def connection_cid():
 			'''generates a random cid for connection
 			'''
 			limit = ceil(float(len(self.client_dic)) / 10) * 10
 			cid = randint(0, limit)
 			if cid in self.client_dic.keys():
-				cid = connection_cid()
-				
-			return(cid)
-		
+				cid = connection_cid()				
+			return(cid)				
 		cid = connection_cid()
-		timeout = [time(), 0]
+		timeout = [time(), 0]	
+				
 		state = states.states['new_connection']
-		data = [state, self.manager_port, cid]			
-		
-		self.handler.sendto(packer.pack(data), ip)
+		data = [state, self.manager_port, cid]		
+				
+		self.send(data, ip)			
 		self.ip_dic[ip] = entity(name, cid, ip, timeout)
-		self.client_dic[cid] = self.ip_dic[ip]
+		self.client_dic[cid] = self.ip_dic[ip]				
+		print("{0} connected; id {1}".format(name, cid))	
 		
-		# Fun debugging stuff, not actually needed
-		contents = ['|' if i < len(self.client_dic) else ' ' for i in range(self.limit)]
+		self.on_client_connect(cid)
 		
-		print("{} connected".format(cid))
-		print('[{0}]{1}{2}'.format(''.join(contents), int((len(self.client_dic)/self.limit)*100),'% Capacity'))
-		
-	def remove_client(self, cid, ip):
+	def client_disconnect(self, cid, ip):
 		'''force client removal
-		:param cid: the universal cid of the client to be removed
-		:param ip: the address [ip, port] of the client to remove
+		@param cid: the universal cid of the client to be removed
+		@param ip: the address [ip, port] of the client to remove
 		'''
 		
+		self.on_client_disconnect(cid)
+				
 		state = states.states['remove_connection']
-		data = [state, cid]
-		
+		data = [state, cid]		
 		self.client_dic.pop(cid)
-		self.ip_dic.pop(ip)				
+		self.ip_dic.pop(ip)	
+		self.send(data, [ip for ip, entity in self.ip_dic.items() if entity.cid != cid])					
 		
-		for ip, entity in self.ip_dic.items():
-			if entity.cid == cid:
-				continue
 				
-			try:
-				self.handler.sendto(packer.pack(data), ip)
-				
-			except Exception as Error:
-				print(Error)
-			
 	def listen(self):
 		'''listens new connections to the server
-		'''
-		
+		'''	
 		try:
 			packet, ip = self.handler.recvfrom(1024)
 		except:
-			return
-			
+			return			
 		try:		
 			state, name = packer.unpack(packet)
-		except:
-			# Invalid packet
-			pass
-		
+		except: # Invalid packet
+			return		
 		if len(self.client_dic) == self.limit:
-			return
-		
+			return		
 		if ip in self.ban_list:
-			return
-		
-		if not ip in self.ip_dic.keys():
-			self.add_client(name, ip)
-
+			return		
+		if not ip in self.ip_dic:
+			self.client_connect(name, ip)
 			
 	def manage(self):
 		'''interprets client data to clients
 		'''
-		
 		try:
 			packet, ip = self.manager.recvfrom(1024)
 		except:
-			return
-		
-		self.recv_bytes += getsizeof(packet)
-		
+			return		
+		self.recv_bytes += getsizeof(packet)		
 		try:
 			state, cid, data, rpc = packer.unpack(packet)
-		except:
-			# Invalid packet
+		except: # Invalid packet
 			return
 		
-		if not cid in self.client_dic.keys():
-			# Unregistered client
-			return  
+		entity = self.client_dic.get(cid)
 		
-		# To maintain efficiency, client functions share the data from one port
-		# The forwarding is not executed if the server is paused
-		# But listens for resume connection calls	
-		if self.paused:
-			return
+		if not entity:
+			return # Unregistered client
 		
-		# Forward data to other clients
-		for ip, entity in self.ip_dic.items():
-			if entity.cid == cid:
-				continue
-				
-			self.handler.sendto(packet, ip)
-		
-		# Update entity timouts	
-		entity = self.client_dic[cid]	
-		entity.timeout = [time(), 0]
-		
-		# Run callbacks and send any returned data
-		for callback in self.callbacks:	
-			returned_data = callback(self, packer.unpack(packet))
-			
-			if not returned_data:
-				continue
+		self.on_receive(packer.unpack(packet))
 
-			state = states.states['server_message']			
-			server_data = [state, -2, returned_data, None]				
-			packet = packer.pack(server_data)
-			
-			for ip, entity in self.ip_dic.items():
-				packet_size = self.handler.sendto(packet, ip)
-				self.sent_bytes += packet_size
+		entity.timeout = [time(), 0] # Update entity timouts		
 				
 	def admin(self):
-		'''runs the server protocols
+		'''runs the server admin protocols
 		'''
-		
 		remove_clients = []
 		# Timeout old clients
 		for ip, entity in self.ip_dic.items():
@@ -196,48 +176,33 @@ class server:
 				print('{0} timed out after {1} seconds'.format(entity.cid, difference))
 				remove_clients.append([entity.cid, ip])
 				
-		for cid, ip in remove_clients:
-			self.remove_client(cid, ip)
+		[self.client_disconnect(cid, ip) for cid, ip in remove_clients]
 			
-	def serve_forever(self, callbacks = []):
-		'''similar to socketserver's server_forever()'''	
+	def update(self, forever=False):
+		'''runs all server processes and updates internal state
+		@param forever:  runs the server within a while loop
+		'''
 		
-		if not type(callbacks) == list:
-			callbacks = [callbacks]
-		
-		self.callbacks = callbacks
-		
-		# Update server, but do not accept new connections if paused
-		while True:
-			self.manage()
-			if self.paused:
-				continue
-			self.listen()
-			self.admin()
-			
-	def update(self, callbacks = []):
-		'''runs server in the same way as serve_forever, but doesn't 
-		freeze game logic by using a per-tick update'''
-		if not type(callbacks) == list:
-			callbacks = [callbacks]
-		
-		self.callbacks = callbacks
-		
-		# Update server, but do not accept new connections if paused
+		if forever:
+			while True:
+				# Update server processes forever
+				self.manage()
+				self.listen()
+				self.admin()
+				
+		# Update server processes each frame
 		self.manage()
-		if self.paused:
-			return
 		self.listen()
 		self.admin()
 		
 class client:
 	'''main client class'''
 	
-	def __init__(self, name = 'client', port = 0, timeout = 3):
+	def __init__(self, name = 'client', port = 0, timeout = 5):
 		'''initialises the client
-		:param name: the name of the client
-		:param port: the port for the client to communicate over
-		:param timeout: the time in seconds before the client aborts connection
+		@param name: the name of the client
+		@param port:  the port for the client to communicate over
+		@param timeout:  the time in seconds before the client aborts connection
 		'''
 				
 		self.local = ('', port)
@@ -255,26 +220,40 @@ class client:
 		self.tunnel.bind(self.local)
 		self.tunnel.setblocking(0)	
 		
-		self.local = self.tunnel.getsockname()
+		self.local = (self.local[0], self.tunnel.getsockname()[1])
 		
-		alert = 'client initialised: {}'.format(self.local)
-		print(alert)
-		print(''.join(['-' for i in range(len(alert))]))
+		print('client initialised: {}'.format(self.local))
+		
+	# User methods
+	def on_connect(self, cid):
+		pass
 	
-	def connect(self, ip = 'localhost', port = 1012):
-		'''connect to the server, and store connection
-		:param ip: the ip address of the host
-		:param port: the port of the host
-		'''
+	def on_receive(self, data):
+		pass
 		
+	def on_send(self, data):
+		pass
+	
+	def on_client_connect(self, cid):
+		pass
+	
+	def on_client_disconnect(self, cid):
+		pass
+	
+	# Core methods
+	def connect(self, ip = 'localhost', port = 1200):
+		'''connect to the server, and store connection
+		@param ip: the ip address of the host
+		@param port: the port of the host
+		'''
 		if self.connected:
 			return
-		
-		self.server = (ip, port)
-		
+
 		state = states.states['new_connection']
 		name = self.name
-		data = ([state, name])
+		
+		data = ([state, name])		
+		self.server = (ip, port)
 		self.tunnel.sendto(packer.pack(data), self.server)
 		
 		start_time = time()
@@ -283,75 +262,88 @@ class client:
 			current_time = time()
 			if (current_time - start_time) > self.timeout:
 				break 
+			
 			self.tunnel.sendto(packer.pack(data), self.server)
+			
 			try:
 				packet, ip = self.tunnel.recvfrom(1024)
-			except:
+			except error:
 				continue
-
-			state, port, cid = packer.unpack(packet)	
 			
+			try:
+				state, port, cid = packer.unpack(packet)	
+			except ValueError:
+				continue
+				
 			self.server = (self.server[0], port)
-			self.connected = True
 			self.cid = cid
 			
+			self.connected = True
+			
 			print('client connected: {}'.format(self.server))
+			
+			self.on_connect(cid)
 			
 			return
 		
 		print('client could not reach host: {}'.format(self.server))
 		
 	def update(self, debug=True, established=False):
-		'''checks for new data and updates core data
-		returns any received data
+		'''checks for new data and updates core data, returns any received data
+		@param debug: return full packet or packet content
+		@param established: only call on_update if packet is valid
 		'''
 		
 		try:
 			packet, ip = self.tunnel.recvfrom(1024)
-		except:
+		except error:
 			return
 		
 		self.recv_bytes += getsizeof(packet)
 		
 		try:
 			state, cid, *data = packer.unpack(packet)
-		except:
-			# Invalid packet
+		except ValueError:# Invalid packet
 			return
 		
-		if not cid in self.cid_to_name.keys():
+		if not cid in self.cid_to_name:
 			self.cid_to_name[cid] = None
 			print('{} connected'.format(cid))
+		
 			
-		if state == states.states['remove_connection']:
-			if cid in self.cid_to_name.keys():
-				if self.cid_to_name[cid]:
-					self.name_to_cid.pop(self.cid_to_name[cid])
-				self.cid_to_name.pop(cid)
-				
-			print('{} disconnected'.format(cid))
+		if state != states.states['established_connection']:
+			
+			if state == states.states['remove_connection']:
+				if cid in self.cid_to_name:
+					if self.cid_to_name[cid]:
+						self.name_to_cid.pop(self.cid_to_name[cid])
+					self.cid_to_name.pop(cid)
+				print('{} disconnected'.format(cid))
 		
-		if established:
-			if state != states.states['established_connection']:
-				if not state == state.states['server_message']:
+				if not state == state.states['server_message'] and established:
 					return
-					
-		if debug:
-			return packer.unpack(packet)		
-		return data[0]
 		
+		# Run on_update callback and send any returned data
+		self.on_receive(packer.unpack(packet))
+		
+		return packer.unpack(packet) if debug else data[0]	
+	
 	def send(self, data, rpc=None):
 		'''send a datatype to the server
 		:param _data: the data to be compressed and sent to the host
 		returns the size of the packet
 		'''
-		
-		if not object:
+		if not data:
 			return
 		
 		state = states.states['established_connection']
 		cid = self.cid
-		_data = ([state, cid, data, rpc])		
+		
+		_data = ([state, cid, data, rpc])	
+		
 		packet_size = self.tunnel.sendto(packer.pack(_data), self.server)
 		self.sent_bytes += packet_size
+		
+		self.on_send(_data)
+		
 		return packet_size
