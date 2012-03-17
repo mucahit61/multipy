@@ -5,7 +5,7 @@ from time import time
 from sys import getsizeof			
 from classes import states, entity, packer
 
-class server:
+class Server:
 	'''main server class
 	'''
 	
@@ -195,7 +195,7 @@ class server:
 		self.listen()
 		self.admin()
 		
-class client:
+class Client:
 	'''main client class'''
 	
 	def __init__(self, name = 'client', port = 0, timeout = 5):
