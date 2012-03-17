@@ -1,18 +1,26 @@
 import multipy
-	
-client = multipy.client()
-client.connect(ip=input("Enter something: "), port=1200)
 
-while 1:
-	received_data = client.update()
-	packet_size = client.send('im talking :D')
-	
-	
-	
-'''The function update() will force the client to check for new data
-the client will detect new clients, and remove old ones in this way
-The function send(_data) will send a datatype to the host (server) defined on connect(ip, port)
+class BareBonesClient(multipy.client):
+    
+    def on_connect(self, cid):
+        print("We've connected!")
+        
+    def on_receive(self, data):
+        # data is the uncompressed packet
+        pass
+    
+    def on_client_connect(self, cid):
+        # cid is the id of the connected client
+        pass
+    
+    def on_client_disconnect(self, cid):
+        # cid is the id of the disconnected client
+        pass
+    
+    def on_send(self, data):
+        # data is the uncompressed packet
+        pass
+    
+my_client = BareBonesClient(name = 'client1', port = 0, timeout = 5)
 
-update() will return any received valid packet
-send() will return the size of the sent packet in bytes
-'''	
+my_client.connect(ip = 'localhost', port = 1200)

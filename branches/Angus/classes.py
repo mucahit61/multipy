@@ -5,12 +5,11 @@ class states:
 	'''
 	
 	states = {
-	'new_connection' : 0,
-	'remove_connection' : 1,
-	'limit_connection' : 2,
-	'ping_connection' : 3,
-	'established_connection' : 4,
-	'server_message' : 5,
+	'new_connection':0,
+	'remove_connection':1,
+	'limit_connection':2,
+	'ping_connection':3,
+	'established_connection':4,
 			}   
 	
 class rpcCommands:
