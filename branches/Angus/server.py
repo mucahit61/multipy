@@ -14,7 +14,7 @@ class BareBonesServer(multipy.Server):
         # cid is the id of the disconnected client
         pass
     
-    def on_send(self, data):
+    def on_send(self, data, ip):
         # data is the uncompressed packet
         pass
     
