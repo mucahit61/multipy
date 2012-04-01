@@ -45,16 +45,16 @@ class Server:
 		print('server manager initialised: {}'.format(manager))		
 		
 	# User methods
-	def on_receive(self, data):
+	def on_receive(self, packet):
 		# Forward data to other clients
 		try:
-			state, cid, data, rpc = data
+			state, cid, data, rpc = packet
 		except ValueError:
-			print("packet could not be unpacked")
+			print("packet could not be unpacked")	
 			
-		self.send(data, [ip for ip, entity in self.ip_dic.items() if entity.cid != cid])	
+		self.send(packet, [ip for ip, entity in self.ip_dic.items() if entity.cid != cid])	
 	
-	def on_send(self, data):
+	def on_send(self, data, ip):
 		pass
 	
 	def on_client_connect(self, cid):
@@ -69,7 +69,10 @@ class Server:
 		'''
 		if not isinstance(ip, list):
 			ip = [ip]
-				
+		
+		if not ip:
+			return
+			
 		packet = packer.pack(data)	
 		sent_bytes = 0
 		for address in ip:
@@ -77,7 +80,7 @@ class Server:
 			sent_bytes += packet_size
 		
 		self.sent_bytes += sent_bytes
-		self.on_send(data)
+		self.on_send(data, ip)
 		return sent_bytes
 	
 	def client_connect(self, name, ip):	 
@@ -146,14 +149,15 @@ class Server:
 			packet, ip = self.manager.recvfrom(1024)
 		except:
 			return		
-		self.recv_bytes += getsizeof(packet)		
+			
+		self.recv_bytes += getsizeof(packet)	
+		
 		try:
 			state, cid, data, rpc = packer.unpack(packet)
 		except: # Invalid packet
 			return
-		
+			
 		entity = self.client_dic.get(cid)
-		
 		if not entity:
 			return # Unregistered client
 		
@@ -300,17 +304,16 @@ class Client:
 			return
 		
 		self.recv_bytes += getsizeof(packet)
-		
+	
 		try:
 			state, cid, *data = packer.unpack(packet)
-		except ValueError:# Invalid packet
+		except ValueError:
 			return
 		
 		if not cid in self.cid_to_name:
 			self.cid_to_name[cid] = None
 			print('{} connected'.format(cid))
-		
-			
+					
 		if state != states.states['established_connection']:
 			
 			if state == states.states['remove_connection']:
@@ -318,14 +321,12 @@ class Client:
 					if self.cid_to_name[cid]:
 						self.name_to_cid.pop(self.cid_to_name[cid])
 					self.cid_to_name.pop(cid)
+					
 				print('{} disconnected'.format(cid))
-		
-				if not state == state.states['server_message'] and established:
-					return
-		
+				
+			
 		# Run on_update callback and send any returned data
 		self.on_receive(packer.unpack(packet))
-		
 		return packer.unpack(packet) if debug else data[0]	
 	
 	def send(self, data, rpc=None):
